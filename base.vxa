@@ -21,7 +21,7 @@
             <StopConditionFormula>
                 <mtSUB>
                     <mtVAR>t</mtVAR>
-                    <mtCONST>5</mtCONST>
+                    <mtCONST>0.5</mtCONST>
                 </mtSUB>
             </StopConditionFormula>
         </StopCondition>
@@ -44,7 +44,7 @@
         </Thermal>
         <Gravity>
             <GravEnabled>1</GravEnabled>
-            <GravAcc>-9.81</GravAcc>
+            <GravAcc>-1.81</GravAcc>
             <FloorEnabled>1</FloorEnabled>
         </Gravity>
     </Environment>

@@ -4,17 +4,21 @@ import numpy as np
 import sys
 from tools import make_one_shape_only, julia_set
 
-SEED = int(sys.argv[1])
+HASH = str(sys.argv[1])
 
-RECORD_HISTORY = True  # saves the behavior movie
+A = float(sys.argv[2])  # .28
+B = float(sys.argv[3])  # .0081
+
+THRESHOLD = int(sys.argv[4])  # 25
+
+RECORD_HISTORY = False  # saves the behavior movie
 
 BODY_DIAMETER = 60  # in voxels
-BODY_HEIGHT = 4  # in voxels
+BODY_THICKNESS = 8
 
-# body dims
-bx, by, bz = (BODY_DIAMETER, BODY_DIAMETER, BODY_HEIGHT)
+bx, by, bz = (BODY_DIAMETER, BODY_THICKNESS, BODY_DIAMETER)
 
-np.random.seed(SEED)
+# np.random.seed(SEED)
 
 # get new voxcraft build
 BUILD_DIR = "/home/slk6335/voxcraft-sim/build"
@@ -22,38 +26,42 @@ sub.call("cp {}/voxcraft-sim .".format(BUILD_DIR), shell=True)
 sub.call("cp {}/vx3_node_worker .".format(BUILD_DIR), shell=True)
 
 # create data folder if it doesn't already exist
-sub.call("mkdir data{}".format(SEED), shell=True)
-sub.call("cp base.vxa data{}/base.vxa".format(SEED), shell=True)
+sub.call("mkdir data{}".format(HASH), shell=True)
+sub.call("cp base.vxa data{}/base.vxa".format(HASH), shell=True)
 
 # clear old .vxd robot files from the data directory
-sub.call("rm data{}/*.vxd".format(SEED), shell=True)
+sub.call("rm data{}/*.vxd".format(HASH), shell=True)
 
 # delete old hist file
-sub.call("rm a{}.hist".format(SEED), shell=True)
+sub.call("rm a{}.hist".format(HASH), shell=True)
 
 # remove old sim output.xml to save new stats
-sub.call("rm output{}.xml".format(SEED), shell=True)
+sub.call("rm output{}.xml".format(HASH), shell=True)
 
 
 ### fractal magic here ###
-threshold = 25  # when to count the fractal as present
-fractal = julia_set(c=.28 +.0081j, height=bx, width=by, max_iterations=256)
-shape = make_one_shape_only(fractal > threshold)
+fractal = julia_set(c=A + B*1j, height=bx, width=bz, max_iterations=256)
+shape = make_one_shape_only(fractal > THRESHOLD)
 ##########################
 
-# body
-body = np.ones((bx, by, bz), dtype=np.int8)
-for z in range(bz):
-    body[:,:,z] = shape
+body = np.zeros((bx, by, bz), dtype=np.int8)  # morphology
+phase = np.zeros((bx, by, bz))  # phase offsets
+
+for thic in range(-by//2, by//2, 1):
+    # body[:,:,bz//2+thic] = shape
+    # phase[:,:,bz//2+thic] = 2*fractal/np.max(fractal)-1
+    body[:,by//2+thic,:] = shape
+    phase[:,by//2+thic,:] = 2*fractal/np.max(fractal)-1
+
+# remove zero padding
+xs,ys,zs = np.where(body!=0) 
+body = body[min(xs):max(xs)+1,min(ys):max(ys)+1,min(zs):max(zs)+1]
+phase = phase[min(xs):max(xs)+1,min(ys):max(ys)+1,min(zs):max(zs)+1]
+bx, by, bz = body.shape
 
 # reformat data for voxcraft
 body = np.swapaxes(body, 0,2)
 body = body.reshape(bz, bx*by)
-
-# phase offsets
-phase = np.zeros((bx, by, bz))
-for z in range(bz):
-    phase[:,:,z] = 2*fractal/np.max(fractal)-1
 
 # reformat phase for voxcraft
 phase = np.swapaxes(phase, 0,2)
@@ -92,12 +100,12 @@ for i in range(phase.shape[0]):
     layer.text = etree.CDATA(str_layer)
 
 # save the vxd to data folder
-with open('data'+str(SEED)+'/bot_0.vxd', 'wb') as vxd:
+with open('data'+str(HASH)+'/bot_0.vxd', 'wb') as vxd:
     vxd.write(etree.tostring(root))
 
 # ok let's finally evaluate all the robots in the data directory
 
 if RECORD_HISTORY:
-    sub.call("./voxcraft-sim -i data{0} -o output{0}.xml -f > a{0}.hist".format(SEED), shell=True)
+    sub.call("./voxcraft-sim -i data{0} -o output{0}.xml -f > a{0}.hist".format(HASH), shell=True)
 else:
-    sub.call("./voxcraft-sim -i data{0} -o output{0}.xml".format(SEED), shell=True)
+    sub.call("./voxcraft-sim -i data{0} -o output{0}.xml".format(HASH), shell=True)
